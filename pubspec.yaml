@@ -1,0 +1,17 @@
+
+name: timer_bell_app
+description: A timer app that plays bell sounds hourly and half-hourly.
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  audioplayers: ^5.2.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/hour_bell.mp3
+    - assets/half_hour_bell.mp3
