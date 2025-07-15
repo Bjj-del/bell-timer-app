@@ -1,117 +1,93 @@
-
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 
-void main() {
-  runApp(const TimerBellApp());
-}
+void main() => runApp(BellTimerApp());
 
-class TimerBellApp extends StatelessWidget {
-  const TimerBellApp({super.key});
-
+class BellTimerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hourly Bell Timer',
+      title: 'Bell Timer',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const TimerHomePage(),
+      home: BellTimerPage(),
     );
   }
 }
 
-class TimerHomePage extends StatefulWidget {
-  const TimerHomePage({super.key});
+class BellTimerPage extends StatefulWidget {
+  @override
+  _BellTimerPageState createState() => _BellTimerPageState();
+}
+
+class _BellTimerPageState extends State<BellTimerPage> {
+  Timer? _hourTimer;
+  Timer? _halfHourTimer;
+  DateTime? _startTime;
+  bool _running = false;
+  int _hoursElapsed = 0;
+  final AudioPlayer _player = AudioPlayer();
+
+  void _toggleTimer() {
+    if (_running) {
+      _hourTimer?.cancel();
+      _halfHourTimer?.cancel();
+      final duration = DateTime.now().difference(_startTime!);
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('計時結束'),
+          content: Text('共經過：${duration.inHours} 小時 ${duration.inMinutes % 60} 分鐘'),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('確定'))],
+        ),
+      );
+    } else {
+      _startTime = DateTime.now();
+      _hoursElapsed = 0;
+
+      _hourTimer = Timer.periodic(Duration(hours: 1), (timer) {
+        _hoursElapsed++;
+        for (int i = 0; i < _hoursElapsed; i++) {
+          Future.delayed(Duration(milliseconds: i * 800), () => _playHourBell());
+        }
+      });
+
+      _halfHourTimer = Timer.periodic(Duration(minutes: 30), (timer) {
+        if (DateTime.now().difference(_startTime!).inMinutes % 60 != 0) {
+          _playHalfHourBell();
+        }
+      });
+    }
+
+    setState(() {
+      _running = !_running;
+    });
+  }
+
+  Future<void> _playHourBell() async {
+    await _player.play(AssetSource('assets/hour_bell.mp3'));
+  }
+
+  Future<void> _playHalfHourBell() async {
+    await _player.play(AssetSource('assets/half_hour_bell.mp3'));
+  }
 
   @override
-  State<TimerHomePage> createState() => _TimerHomePageState();
-}
-
-class _TimerHomePageState extends State<TimerHomePage> {
-  bool isRunning = false;
-  late Timer timer;
-  int secondsPassed = 0;
-  final AudioPlayer player = AudioPlayer();
-
-  void startTimer() {
-    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        secondsPassed++;
-      });
-      final minutes = secondsPassed ~/ 60;
-      if (secondsPassed % 3600 == 0) {
-        // 每小時整點：播放對應次數鐘聲
-        final hour = secondsPassed ~/ 3600;
-        playHourBell(hour);
-      } else if (secondsPassed % 1800 == 0) {
-        // 每半小時
-        playHalfHourBell();
-      }
-    });
-  }
-
-  void stopTimer() {
-    timer.cancel();
-    setState(() {
-      isRunning = false;
-    });
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('計時結束'),
-        content: Text('總共經過了 ${formatTime(secondsPassed)}'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('OK'))
-        ],
-      ),
-    );
-  }
-
-  void playHourBell(int count) async {
-    for (int i = 0; i < count; i++) {
-      await player.play(AssetSource('hour_bell.mp3'));
-      await Future.delayed(const Duration(milliseconds: 1200));
-    }
-  }
-
-  void playHalfHourBell() async {
-    await player.play(AssetSource('half_hour_bell.mp3'));
-  }
-
-  String formatTime(int seconds) {
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    final s = seconds % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  void dispose() {
+    _hourTimer?.cancel();
+    _halfHourTimer?.cancel();
+    _player.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('鐘聲計時器')),
+      appBar: AppBar(title: Text('鐘聲計時器')),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('已過時間：${formatTime(secondsPassed)}',
-                style: const TextStyle(fontSize: 24)),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                if (!isRunning) {
-                  setState(() {
-                    isRunning = true;
-                    secondsPassed = 0;
-                  });
-                  startTimer();
-                } else {
-                  stopTimer();
-                }
-              },
-              child: Text(isRunning ? '停止' : '開始'),
-            ),
-          ],
+        child: ElevatedButton(
+          onPressed: _toggleTimer,
+          child: Text(_running ? '停止計時' : '開始計時'),
         ),
       ),
     );
